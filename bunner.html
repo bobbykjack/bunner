@@ -4,14 +4,18 @@
     <meta charset="utf-8" />
     <style>
     canvas { background-color: #111; display: block; margin: auto; }
+    #dialog { width: 900px; background-color: #fff; }
     p { text-align: center; font-style: italic; }
     </style>
-    <title>BuNNER: Top-down puzzle game — /src/games/top-down-puzzle/</title>
+    <title>BuNNER: A top-down puzzle game</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 </head>
 <body>
-    <p>Note: in <a href="https://bobbyjack.me/2019/10/02/about-bunner">this first version</a>, the single level has the most basic win condition: complete one turn</p>
+    <p>
+        Note: in <a href="https://bobbyjack.me/2019/10/03/bunner">this version (0.2)</a>, there are two tiles, some rudimentary graphics, ‘movement’, and a new win condition. <a href="https://bobbyjack.me/2019/10/02/bunner/bunner">Previous version (0.1)</a>.
+    </p>
     <canvas id="canvas"></canvas>
+    <canvas id="dialog" width="900"></canvas>
     <script src="bunner.js"></script>
 </body>
 </html>

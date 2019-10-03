@@ -1,51 +1,57 @@
 
 'use strict';
 
-// Bunner, version 0.1
+// Bunner, version 0.2
 
-// Absolute minimal 'gameplay': present simple title screen, level, and win
-// screen. Level just has a single win condition — complete one move — although
-// that won't even be properly implemented yet. Instead, just hit space to skip
-// a turn and win (i.e. the same effect, just hard-coded).
+// This version introduces rudimentary graphics and movement
 
-// Since there is, currently, no animation planned, we'll start by simply
-// repainting on demand, rather than tens of times per second.
-const version = 0.1,
-
-// For now, we're just limiting ourselves to the first level
+const version = 0.2,
     level = 0,
-
-// We'll just store levels in one big array until we need to support many
     levels = [
-
-// Each level in the array consists of two strings representing terrain and
-// objects respectively. In this mockup, 'g' might represent grass and 'b', the
-// bunner.
-        [ "g", "b" ]
+// The level now consists of 2 tiles
+        [ "gg", "bf" ]
     ],
-
-// Each tile is a square; this value defines its height and width in pixels
     tileSize = 32,
-
-// Terrain won't actively be used yet, but this is how we'll set it up ...
-    terrain = processDataString(levels[level][0]),
-
-// ... along with objects. We store both initially as strings so that levels can
-// easily be edited by hand, although a level editor will be created eventually.
-    objects = processDataString(levels[level][1]),
-
-// Height and width of the grid are determined from level data - this allows
-// them to vary from one level to another.
-    height = terrain.length,
-    width = terrain[0].length,
-
-// Just one canvas for everything, for now.
     canvas = document.getElementById("canvas"),
-    ctx = canvas.getContext("2d");
+    ctx = canvas.getContext("2d"),
 
-// We'll use an integer to keep track of which screen we're showing: title,
-// level, or 'congratulations'
-var screenNum;
+// A new canvas to show messages to the user
+    dialogCanvas = document.getElementById("dialog"),
+    dialogCtx = dialogCanvas.getContext("2d")
+;
+
+var terrain,
+    objects,
+    screenNum,
+    height,
+    width,
+
+// This was a major omission from version 0.1! Keep track of how many turns
+// we've taken.
+    turn,
+
+// The bunner sprite. It's chunky, but it'll do for a first go.
+    bunner = `
+   bb
+  bdbb
+ bdlbe
+ bdlbb
+bbdlbbb
+bbbdbb
+ bbbbb
+b bbbbb`,
+
+// A sprite for the 'flag' which will represent our winning tile in this level
+    flag = `
+  xxgxx
+  xgggx
+  xxgxx
+  xxxxx
+     xd
+     xd
+     xd
+     xd`,
+  objectSprites = {};
 
 init();
 
@@ -54,8 +60,12 @@ init();
  * Split up a string into a two-dimensional array representing values in the
  * grid
  */
-function processDataString(str) {
-    str = str.trim().split("\n"),
+function processDataString(str, trim) {
+    if (trim) {
+        str = str.trim();
+    }
+
+    str = str.split("\n"),
     str.forEach(function(v, i, a) { a[i] = a[i].split(""); });
     return str;
 }
@@ -65,28 +75,70 @@ function processDataString(str) {
  * input, and show the title screen.
  */
 function init() {
-    if (height < 1 || width < 1) {
-// Should probably, one day, report this error via the canvas, although this
-// shouldn't really happen in 'production'. Maybe it would be worth doing if
-// levels can be edited by hand (which will probably be the case).
-        console.error("invalid data");
-        return;
-    }
+// This is a bit messy; we're just hard-coding a couple of sprites right now
+    objectSprites["b"] = processDataString(bunner);
+    objectSprites["b"].shift();
+
+    objectSprites["f"] = processDataString(flag);
+    objectSprites["f"].shift();
 
     window.addEventListener('keypress', function(ev) {
         if (screenNum == 0) {
             showLevel();
         } else if (screenNum == 1) {
-// 32 (space) means 'skip turn'
             if (ev.keyCode == 32) {
-                win();
+                turn++;
             }
         } else if (screenNum == 2) {
+            clearDialog();
+            win();
+        } else if (screenNum == 3) {
             titleScreen();
         }
     });
 
+// We need to check for arrow keys using keyup since they don't trigger a
+// keypress. A keydown would also work, but that fires multiple times when held
+// down, and we don't want that behaviour.
+    window.addEventListener('keyup', function(ev) {
+        var msg;
+
+        if (screenNum == 1) {
+            if (ev.keyCode == 39) {
+                turn++;
+
+// Move Bunner one tile to the right. For now, we just hardcode this, but in
+// future it will need to [...] 
+                objects[0] = [ "", "b" ];
+                drawLevel();
+
+                msg = "Well done, you beat this level in " + turn + " turn"
+                    + (turn == 1 ? "" : "s") + ". Press any key to continue.";
+
+                dialog(msg);
+                screenNum = 2;
+            }
+        }
+    });
+
     titleScreen();
+}
+
+/**
+ * Populate the dialog canvas with a message 
+ */
+function dialog(msg) {
+    dialogCtx.font = "16px sans-serif";
+    dialogCtx.fillStyle = "rgb(0, 0, 0)";
+    dialogCtx.fillText(msg, 0, 20);
+}
+
+/**
+ * Remove all text from the dialog by painting over the whole thing
+ */
+function clearDialog() {
+    dialogCtx.fillStyle = "rgb(255, 255, 255)";
+    dialogCtx.fillRect(0, 0, dialogCanvas.width, dialogCanvas.height);
 }
 
 /**
@@ -105,15 +157,122 @@ function titleScreen() {
 }
 
 /**
- * Display the current level - for now, this is just totally hard-coded. In
- * time, it will display the terrain and objects in their current state.
+ * Show the level by setting it up first, then drawing it. This should happen
+ * whenever we start the level - maybe needs a better name!
  */
 function showLevel() {
     screenNum = 1;
+    turn = 0;
+
+    terrain = processDataString(levels[level][0], true);
+    objects = processDataString(levels[level][1], true);
+
+    height = terrain.length;
+    width = terrain[0].length;
+
+    if (height < 1 || width < 1) {
+// Should probably, one day, report this error via the canvas, although this
+// shouldn't really happen in 'production'. Maybe it would be worth doing if
+// levels can be edited by hand (which will probably be the case).
+        console.error("invalid data");
+        return;
+    }
+
     canvas.width = tileSize * width;
     canvas.height = tileSize * height;
-    ctx.fillStyle = "rgb(255, 0, 0)";
-    ctx.fillRect(1, 1, 30, 30);
+
+    drawLevel();
+}
+
+/**
+ * Draw the current level by drawing, first, terrain, then objects on top.
+ */
+function drawLevel() {
+    drawTerrain();
+    drawObjects();
+}
+
+/**
+ * Draw all the terrain tiles
+ */
+function drawTerrain() {
+    var y = 0,
+        x,
+        colors = {
+            "g": [ 0, 200, 0 ]
+        };
+
+    for (y = 0; y < terrain.length; y++) {
+        for (x = 0; x < terrain[y].length; x++) {
+            if (setColor(ctx, colors, terrain[y][x])) {
+                ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+            }
+        }
+    }
+}
+
+/**
+ * Draw all the objects onto the canvas
+ */
+function drawObjects() {
+    var y = 0,
+        x;
+
+    for (y = 0; y < objects.length; y++) {
+        for (x = 0; x < objects[y].length; x++) {
+            if (objectSprites.hasOwnProperty(objects[y][x])) {
+                drawObject(x * tileSize, y * tileSize, objects[y][x]);
+            }
+        }
+    }
+}
+
+/**
+ * Draw an individual object
+ */
+function drawObject(x, y, id) {
+    var x2,
+        y2,
+        objectColors = {
+            "b": {
+                "b": [ 57, 36, 36 ],
+                "d": [ 23, 0, 0 ],
+                "l": [ 220, 207, 174 ],
+                "e": [ 226, 180, 40 ]
+            },
+            "f": {
+                "x": [ 70, 70, 70 ],
+                "g": [ 255, 0, 0 ],
+                "d": [ 0, 0, 0 ]
+            }
+        };
+
+    for (y2 = 0; y2 < objectSprites[id].length; y2++) {
+        for (x2 = 0; x2 < objectSprites[id][y2].length; x2++) {
+            if (setColor(ctx, objectColors[id], objectSprites[id][y2][x2])) {
+                ctx.fillRect(x + (x2 * 4), y + (y2 * 4), 4, 4);
+            }
+        }
+    }
+}
+
+/**
+ * Set the fill style on the given context, according to the value in the colors
+ * map, indexed by the key
+ */
+function setColor(ctx, colors, key) {
+    var color;
+
+    if (colors.hasOwnProperty(key)) {
+        color = colors[key];
+
+        ctx.fillStyle =
+            "rgb(" + color[0] + ", " + color[1] + ", " + color[2] + ")";
+
+        return true;
+    }
+
+    return false;
 }
 
 /**
@@ -122,11 +281,11 @@ function showLevel() {
  */
 function win() {
     var x;
-    screenNum = 2;
+    screenNum = 3;
     infoScreen();
     x = canvas.width / 2;
     ctx.fillText("CONGRATULATIONS!", x, 40);
-    ctx.fillText("You won.", x, 80);
+    ctx.fillText("You won. By beating the only level.", x, 80);
     ctx.fillText("Press any key to return to title screen", x, 160);
 }
 
