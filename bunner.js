@@ -1,15 +1,20 @@
 
 'use strict';
 
-// Bunner, version 0.2
+// Bunner, version 0.3
 
-// This version introduces rudimentary graphics and movement
+// This version will include both the first two levels, plus a new one. It will
+// be the first time we've had multiple levels, so it's a good opportunity to
+// stop hardcoding things like win conditions.
 
-const version = 0.2,
-    level = 0,
+// Also proper movement
+
+const version = 0.3,
     levels = [
+        [ "g", "b" ],
+        [ "gg", "bf" ],
 // The level now consists of 2 tiles
-        [ "gg", "bf" ]
+        [ "gg\ngg", "b \n f" ]
     ],
     tileSize = 32,
     canvas = document.getElementById("canvas"),
@@ -17,14 +22,16 @@ const version = 0.2,
 
 // A new canvas to show messages to the user
     dialogCanvas = document.getElementById("dialog"),
-    dialogCtx = dialogCanvas.getContext("2d")
-;
+    dialogCtx = dialogCanvas.getContext("2d");
 
-var terrain,
+var level = 0,
+    terrain,
     objects,
     screenNum,
     height,
     width,
+
+    movedOnto,
 
 // This was a major omission from version 0.1! Keep track of how many turns
 // we've taken.
@@ -75,53 +82,118 @@ function processDataString(str, trim) {
  * input, and show the title screen.
  */
 function init() {
+    processObjectSprites();
+
+// All events are now caught via the keyup listener ...
+    window.addEventListener('keyup', function(ev) {
+        if (screenNum == 0) {
+            showLevel();
+        } else if (screenNum == 1) {
+            var moved = false,
+                redraw = false;
+
+            if (ev.keyCode == 32) {
+                moved = true;
+            } else if (ev.keyCode == 37 || ev.keyCode == 65) {
+                moved = moveBunner(-1, 0);
+                redraw = true;
+            } else if (ev.keyCode == 38 || ev.keyCode == 87) {
+                moved = moveBunner(0, -1);
+                redraw = true;
+            } else if (ev.keyCode == 39 || ev.keyCode == 68) {
+                moved = moveBunner(1, 0);
+                redraw = true;
+            } else if (ev.keyCode == 40 || ev.keyCode == 83) {
+                moved = moveBunner(0, 1);
+                redraw = true;
+            }
+
+            if (moved) {
+                turn++;
+
+                if (redraw) {
+                    drawLevel();
+                }
+
+                endTurn();
+            }
+
+
+        } else if (screenNum == 2) {
+            clearDialog();
+
+            if (++level > levels.length - 1) {
+                win();
+            } else {
+                showLevel();
+            }
+        } else if (screenNum == 3) {
+            titleScreen();
+        }
+    });
+
+    titleScreen();
+}
+
+/**
+ * Process the game state at the end of a turn. Currently, win conditions for
+ * each level are hard-coded here.
+ */
+function endTurn() {
+// We win the first level just by having made a move, and we win the other two
+// levels if we just moved onto the flag.
+    if ((level == 0) || ((level == 1 || level == 2) && movedOnto == "f")) {
+        dialog(winMessage());
+        screenNum = 2;
+    }
+}
+
+/**
+ * Move Bunner x tiles horizontally and y tiles vertically
+ */
+function moveBunner(x, y) {
+    var tx, ty, newx, newy, inbounds
+
+    for (ty = 0; ty < objects.length; ty++) {
+        for (tx = 0; tx < objects[ty].length; tx++) {
+            if (objects[ty][tx] == "b") {
+                newx = tx + x;
+                newy = ty + y;
+
+                inbounds = newx >= 0 && newx < objects[ty].length && newy >= 0
+                    && newy < objects.length;
+
+                if (inbounds) {
+                    movedOnto = objects[newy][newx];
+                    objects[ty][tx] = 0;
+                    objects[newy][newx] = "b";
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Convert sprite data into a slightly more-easy-to-work-with format
+ */
+function processObjectSprites() {
 // This is a bit messy; we're just hard-coding a couple of sprites right now
     objectSprites["b"] = processDataString(bunner);
     objectSprites["b"].shift();
 
     objectSprites["f"] = processDataString(flag);
     objectSprites["f"].shift();
+}
 
-    window.addEventListener('keypress', function(ev) {
-        if (screenNum == 0) {
-            showLevel();
-        } else if (screenNum == 1) {
-            if (ev.keyCode == 32) {
-                turn++;
-            }
-        } else if (screenNum == 2) {
-            clearDialog();
-            win();
-        } else if (screenNum == 3) {
-            titleScreen();
-        }
-    });
-
-// We need to check for arrow keys using keyup since they don't trigger a
-// keypress. A keydown would also work, but that fires multiple times when held
-// down, and we don't want that behaviour.
-    window.addEventListener('keyup', function(ev) {
-        var msg;
-
-        if (screenNum == 1) {
-            if (ev.keyCode == 39) {
-                turn++;
-
-// Move Bunner one tile to the right. For now, we just hardcode this, but in
-// future it will need to [...] 
-                objects[0] = [ "", "b" ];
-                drawLevel();
-
-                msg = "Well done, you beat this level in " + turn + " turn"
-                    + (turn == 1 ? "" : "s") + ". Press any key to continue.";
-
-                dialog(msg);
-                screenNum = 2;
-            }
-        }
-    });
-
-    titleScreen();
+/**
+ * Get the 'win' message, including a not about how many turns the player took
+ */
+function winMessage() {
+    return "Well done, you beat this level in " + turn + " turn"
+        + (turn == 1 ? "" : "s") + ". Press any key to continue.";
 }
 
 /**
@@ -148,6 +220,7 @@ function clearDialog() {
 function titleScreen() {
     var x;
     screenNum = 0;
+    level = 0;
     infoScreen();
     x = canvas.width / 2;
     ctx.fillText("Bunner — a game by bobbyjack", x, 40);
@@ -285,7 +358,7 @@ function win() {
     infoScreen();
     x = canvas.width / 2;
     ctx.fillText("CONGRATULATIONS!", x, 40);
-    ctx.fillText("You won. By beating the only level.", x, 80);
+    ctx.fillText("You won by beating all " + levels.length + " levels.", x, 80);
     ctx.fillText("Press any key to return to title screen", x, 160);
 }
 
