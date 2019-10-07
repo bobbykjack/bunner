@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <style>
-    canvas { background-color: #111; display: block; margin: auto; }
+    canvas { background-color: #111; display: block; margin: auto; outline: 1px dashed #777; width: 800px; height: 400px; position: absolute; top: 50%; left: 50%; margin-top: -300px; margin-left: -400px; }
     #dialog { width: 900px; background-color: #fff; }
     p { text-align: center; font-style: italic; }
     </style>
@@ -11,8 +11,7 @@
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <canvas id="dialog" width="900"></canvas>
+    <canvas id="canvas" width="800" height="600"></canvas>
     <script src="bunner.js"></script>
 </body>
 </html>
