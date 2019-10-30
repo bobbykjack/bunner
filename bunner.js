@@ -6,7 +6,7 @@
 // Lots of refactoring to make everything a lot cleaner. Data (levels and
 // sprites) now stored in json file and loaded via ajax.
 
-const version = 0.4,
+const version = 0.5,
     tileSize = 32,
     canvas = document.getElementById("canvas"),
     ctx = canvas.getContext("2d");
@@ -32,7 +32,11 @@ var w = 800,
         drawGrid: 1
     },
 // Object sprites are now stored in a json file
-    objectSprites = {};
+    objectSprites = {},
+// This map is a cache of Canvas objects; instead of repeatedly drawing an 
+// individual sprite, it gets drawn onto a canvas once, then that canvas gets
+// drawn onto the main one, as required.
+    canvases = {};
 
 loadData();
 
@@ -58,7 +62,7 @@ function getPixelRatio(context) {
  */
 function loadData() {
     var request = new XMLHttpRequest();
-    request.open("get", "data.json");
+    request.open("get", "data.json?nocache=" + (new Date()).getTime());
 
     request.addEventListener("load", function() {
         var data = JSON.parse(this.responseText);
@@ -331,19 +335,67 @@ function drawTerrain() {
         tileX = Math.floor((tilesH / 2) - (width / 2)),
         tileY = Math.floor((tilesV / 2) - (height / 2)),
         baseX = Math.floor((w - (tilesH * (tileSize + gutter)) - gutter ) / 2),
-        baseY = Math.floor((h - (tilesV * (tileSize + gutter)) - gutter ) / 2);
+        baseY = Math.floor((h - (tilesV * (tileSize + gutter)) - gutter ) / 2),
+        tx,
+        ty;
 
     for (y = 0; y < height; y++) {
         for (x = 0; x < width; x++) {
-            if (setColor(ctx, colors, levels[level].terrain)) {
-                drawTerrainTile(
-                    baseX + ((tileX + x) * (tileSize + gutter)) + gutter,
-                    baseY + ((tileY + y) * (tileSize + gutter)) + gutter,
-                    levels[level].terrain
-                );
+            tx = baseX + ((tileX + x) * (tileSize + gutter)) + gutter;
+            ty = baseY + ((tileY + y) * (tileSize + gutter)) + gutter;
+
+            if (levels[level].terrain == "g") {
+                ctx.drawImage(grass(32), tx, ty);
+            } else if (setColor(ctx, colors, levels[level].terrain)) {
+                drawTerrainTile(tx, ty, levels[level].terrain);
             }
         }
     }
+}
+
+/**
+ * Create and return a Canvas object with a drawing of the grass tile on it
+ */
+function grass(size) {
+    if (canvases.hasOwnProperty("grass")) {
+        return canvases["grass"];
+    }
+
+    var grass = document.createElement("canvas"),
+        grass_ctx = grass.getContext("2d"),
+        minSize = 2,
+        tmpSize,
+        layers = objectSprites["g"].layers,
+        palette = objectSprites["g"].palette,
+        layer,
+        tsize,
+        idx,
+        x,
+        y;
+
+    grass.width = size;
+    grass.height = size;
+
+    for (idx in layers) {
+        layer = layers[idx];
+        tsize = size / layer.length;
+
+        if (tsize < minSize) {
+            continue;
+        }
+
+        for (y = 0; y < layer.length; y++) {
+            for (x = 0; x < layer.length; x++) {
+                if (palette.hasOwnProperty(layer[y][x])) {
+                    grass_ctx.fillStyle = palette[layer[y][x]];
+                    grass_ctx.fillRect(x * tsize, y * tsize, tsize, tsize);
+                }
+            }
+        }
+    }
+
+    canvases["grass"] = grass;
+    return grass;
 }
 
 /**
@@ -424,12 +476,13 @@ function drawObjects() {
 function drawObject(x, y, id) {
     var x2,
         y2,
-        sprite = objectSprites[id];
+        sprite = objectSprites[id],
+        size = tileSize / sprite.tiles.length;
 
     for (y2 = 0; y2 < sprite.tiles.length; y2++) {
         for (x2 = 0; x2 < sprite.tiles[y2].length; x2++) {
             if (setColor(ctx, sprite.palette, sprite.tiles[y2][x2], 0.9)) {
-                ctx.fillRect(x + (x2 * 4), y + (y2 * 4), 4, 4);
+                ctx.fillRect(x + (x2 * size), y + (y2 * size), size, size);
             }
         }
     }
